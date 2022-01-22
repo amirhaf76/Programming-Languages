@@ -8,9 +8,26 @@
 
 ;; CHANGE add the missing ones
 
-(struct var  (string) #:transparent)  ;; a variable, e.g., (var "foo")
-(struct num  (int)    #:transparent)  ;; a constant number, e.g., (num 17)
-(struct plus  (e1 e2)  #:transparent)  ;; add two expressions
+(struct var  (string)   #:transparent)  ;; a variable, e.g., (var "foo")
+(struct num  (int)      #:transparent)  ;; a constant number, e.g., (num 17)
+(struct plus  (e1 e2)   #:transparent)  ;; add two expressions
+(struct munus (e1 e2)   #:transparent)  ;; subtract two expressions
+(struct mult (e1 e2)    #:transparent)  ;; multiplication two expressions
+(struct div (e1 e2)     #:transparent)  ;; division two expressions
+(struct neg (e1)        #:transparent)  ;; negation one expression
+(struct andalso (e1 e2) #:transparent)  ;; logical conjunction two expressions
+(struct orelse (e1 e2)  #:transparent)  ;; logical disjunction two expressions
+
+(struct cnd (e1 e2 e3)      #:transparent)  ;; condition
+(struct iseq (e1 e2)        #:transparent)  ;; comparison
+(struct ifnzero (e1 e2 e3)  #:transparent)  ;; checking if n is zero
+(struct ifleq (e1 e2 e3 e4) #:transparent)  ;; strictly greater
+;(struct lam (s1 s2 e)       #:transparent)  ;; recurfunction. lam null s2 e
+;apply
+(struct with (s e1 e2) #:transparent)  ;; it's like let s,e1 in e2
+(struct apair (e1 e2)      #:transparent)  ;; pair constructor
+
+
 
 
 (struct lam  (nameopt formal body) #:transparent) ;; a recursive(?) 1-argument function
@@ -38,8 +55,17 @@
 
 ;; Problem 1
 
-(define (racketlist->numexlist xs) "CHANGE")
-(define (numexlist->racketlist xs) "CHANGE")
+(define (racketlist->numexlist xs)
+  (cond [(null? xs) (munit)]
+        [(null? (cdr xs)) (cons [car xs] (cons (munit) null))]
+        [true (cons [car xs][racketlist->numexlist [cdr xs]])]
+        ))
+
+(define (numexlist->racketlist xs)
+  (cond [(munit? xs) `()]
+        [(munit? (car(cdr xs))) (cons [car xs] null)]
+        [true (cons [car xs] [numexlist->racketlist [cdr xs]])]
+        ))
 
 ;; Problem 2
 
@@ -47,9 +73,10 @@
 ;; Complete this function
 (define (envlookup env str)
   (cond [(null? env) (error "unbound variable during evaluation" str)]
-  		"CHANGE" 
-		)
- )
+        [(equal? (car env) str) (car env)]
+        [true (envlookup [cdr env] str)]
+        )
+  )
 
 ;; Complete more cases for other kinds of NUMEX expressions.
 ;; We will test eval-under-env by calling it directly even though
