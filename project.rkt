@@ -22,21 +22,20 @@
 (struct iseq (e1 e2)        #:transparent)  ;; comparison
 (struct ifnzero (e1 e2 e3)  #:transparent)  ;; checking if n is zero
 (struct ifleq (e1 e2 e3 e4) #:transparent)  ;; strictly greater
-;(struct lam (s1 s2 e)       #:transparent)  ;; recurfunction. lam null s2 e
-;apply
+(struct lam (s1 s2 e)       #:transparent)  ;; a recursive(?) 1-argument function
+(struct apply (e1 e2)       #:transparent) ;; function application
+
 (struct with (s e1 e2) #:transparent)  ;; it's like let s,e1 in e2
-(struct apair (e1 e2)      #:transparent)  ;; pair constructor
+(struct apair (e1 e2)  #:transparent)  ;; pair constructor
+(struct 1st (e1)       #:transparent)  ;; the first part of a pair
+(struct 2nd (e1)       #:transparent)  ;; the second part of a pair
 
+(struct closure (env f)  #:transparent)  ;; envrioment and function
 
-
-
-(struct lam  (nameopt formal body) #:transparent) ;; a recursive(?) 1-argument function
-(struct tlam  (nameopt formal arg-type body) #:transparent) ;; a typed argument, recursive(?) 1-argument function
-(struct apply (funexp actual)       #:transparent) ;; function application
-
+(struct letrec (s1 e1 s2 e2 s3 e3 s4 e4 e5)  #:transparent)  ;; recursive definition
 
 (struct munit   ()      #:transparent) ;; unit value -- good for ending a list
-(struct ismunit (e)     #:transparent) ;; if e1 is unit then true else false
+(struct ismunit (e1)     #:transparent) ;; if e1 is unit then true else false
 
 ;; a closure is not in "source" programs; it is what functions evaluate to
 (struct closure (env f) #:transparent) 
@@ -46,7 +45,6 @@
 (struct record (k r) #:transparent) ;; record holds several keys
 (struct value (s r) #:transparent) ;; value returns corresponding value of s in r
 
-(struct letrec (s1 e1 s2 e2 e3) #:transparent) ;; a letrec expression for recursive definitions
 
 ;; Type structures
 ;; Primitive types are: "int", "bool" and "null"
