@@ -85,7 +85,7 @@
          (envlookup env (var-string e))]
         [(num? e)  ; ** num
          (e)]
-        [(bool? e)
+        [(bool? e) ; ** bool
          (e)]
         [(plus? e) ; ** plus
          (let ([v1 (eval-under-env (plus-e1 e) env)]
@@ -135,25 +135,50 @@
                         [if (bool? v2)
                             (bool-b v2)
                             (error "NUMEX logical conjunction applied to non-boolean")])
-                   #f)
+                   (bool #f))
                (error "NUMEX logical conjunction applied to non-boolean")])]
         [(orelse? e) ; ** logical disjunction
          (let [v1 (eval-under-env (orelse-e1 e) env)] ; [v2 (eval-under-env (andalso-e2 e) env)]
            [if (bool? v1)
                (if (bool-b v1)
-                   #t
+                   (bool #t)
                    (let [v2 (eval-under-env (orelse-e2 e) env)]
                         [if (bool? v2)
                             (bool-b v2)
                             (error "NUMEX logical disjunction applied to non-boolean")]))
                (error "NUMEX logical disjunction applied to non-boolean")])]
-        [(cnd e) ; ** condition
+        [(cnd? e) ; ** condition
          (let [v1 (eval-under-env (cnd-e1 e) env)]
            (if (bool? v1)
                (if (bool-b v1)
                    (eval-under-env (cnd-e2 e) env)
                    (eval-under-env (cnd-e3 e) env))
-               (error "NUMEX condition applied to non-number")))]
+               (error "NUMEX condition applied to non-boolean")))]
+        [(iseq? e) ; ** is equal?
+         (let ([v1 (eval-under-env (cnd-e1 e) env)]
+               [v2 (eval-under-env (cnd-e2 e) env)])
+           (cond [(and (bool? v1) (bool? v2)) (bool (eq? (bool-b v1)  (bool-b v2)))]
+                 [(and (bool? v1) (num? v2))  (bool (eq? (bool-b v1)  (num-int v2)))]
+                 [(and (num? v1) (bool? v2))  (bool (eq? (num-int v1) (bool-b v2)))]
+                 [(and (num? v1) (num? v2))   (bool (eq? (num-int v1) (num-int v2)))]
+                 [true (error "NUMEX iseq applied to non-boolean or non-number")])
+           )]
+        [(ifnzero? e) ; ** if n is zero, do e2 else e3
+         (let [v1 (eval-under-env (cnd-e1 e) env)]
+           (if [num? v1]
+               [if (= (num-int v1) 0)
+                   (eval-under-env (cnd-e3 e) env)
+                   (eval-under-env (cnd-e2 e) env)]
+               [true (error "NUMEX ifnzero applied to non-number")])
+           )]
+        [(ifleq? e) ; ** if n is zero, do e2 else e3
+         (let [v1 (eval-under-env (cnd-e1 e) env)]
+           (if [num? v1]
+               [if (= (num-int v1) 0)
+                   (eval-under-env (cnd-e3 e) env)
+                   (eval-under-env (cnd-e2 e) env)]
+               [true (error "NUMEX ifnzero applied to non-number")])
+           )]
         ;; CHANGE add more cases here
         [(string? e) e]
         [#t (error (format "bad NUMEX expression: ~v" e))]))
