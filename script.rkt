@@ -2,6 +2,7 @@
 (struct var  (string) #:transparent)  ;; a variable, e.g., (var "foo")
 (struct num  (int)    #:transparent)  ;; a constant number, e.g., (num 17)
 (struct plus  (e1 e2)  #:transparent)  ;; add two expressions
+;(struct andalso (e1 e2) #:transparent)  ;; logical conjunction two expressions
 
 (struct munit   ()      #:transparent)
 
