@@ -8,9 +8,9 @@
 
 ;; CHANGE add the missing ones
 
-(struct var  (string)   #:transparent)  ;; a variable, e.g., (var "foo")
+(struct var  (string value)   #:transparent)  ;; a variable, e.g., (var "foo")
 (struct num  (int)      #:transparent)  ;; a constant number, e.g., (num 17)
-(struct bool  (b)      #:transparent)  ;; a constant number, e.g., (num 17)
+(struct bool  (b)       #:transparent)  ;; a boolean
 (struct plus  (e1 e2)   #:transparent)  ;; add two expressions
 (struct munus (e1 e2)   #:transparent)  ;; subtract two expressions
 (struct mult (e1 e2)    #:transparent)  ;; multiplication two expressions
@@ -24,19 +24,20 @@
 (struct ifnzero (e1 e2 e3)  #:transparent)  ;; checking if n is zero
 (struct ifleq (e1 e2 e3 e4) #:transparent)  ;; strictly greater
 (struct lam (s1 s2 e)       #:transparent)  ;; a recursive(?) 1-argument function
-(struct apply (e1 e2)       #:transparent) ;; function application
+(struct apply (e1 e2)       #:transparent)  ;; function application
 
 (struct with (s e1 e2) #:transparent)  ;; it's like let s,e1 in e2
 (struct apair (e1 e2)  #:transparent)  ;; pair constructor
 (struct 1st (e1)       #:transparent)  ;; the first part of a pair
 (struct 2nd (e1)       #:transparent)  ;; the second part of a pair
 
-(struct closure (env f)  #:transparent)  ;; envrioment and function
 
 (struct letrec (s1 e1 s2 e2 s3 e3 s4 e4 e5)  #:transparent)  ;; recursive definition
 
+
 (struct munit   ()      #:transparent) ;; unit value -- good for ending a list
 (struct ismunit (e1)     #:transparent) ;; if e1 is unit then true else false
+
 
 ;; a closure is not in "source" programs; it is what functions evaluate to
 (struct closure (env f) #:transparent) 
@@ -72,7 +73,7 @@
 ;; Complete this function
 (define (envlookup env str)
   (cond [(null? env) (error "unbound variable during evaluation" str)]
-        [(equal? (car env) str) (car env)]
+        [(equal? (var-string (car env)) str) (car env)]
         [true (envlookup [cdr env] str)]
         )
   )
@@ -155,30 +156,58 @@
                    (eval-under-env (cnd-e3 e) env))
                (error "NUMEX condition applied to non-boolean")))]
         [(iseq? e) ; ** is equal?
-         (let ([v1 (eval-under-env (cnd-e1 e) env)]
-               [v2 (eval-under-env (cnd-e2 e) env)])
-           (cond [(and (bool? v1) (bool? v2)) (bool (eq? (bool-b v1)  (bool-b v2)))]
-                 [(and (bool? v1) (num? v2))  (bool (eq? (bool-b v1)  (num-int v2)))]
-                 [(and (num? v1) (bool? v2))  (bool (eq? (num-int v1) (bool-b v2)))]
-                 [(and (num? v1) (num? v2))   (bool (eq? (num-int v1) (num-int v2)))]
+         (let ([v1 (eval-under-env (iseq-e1 e) env)]
+               [v2 (eval-under-env (iseq-e2 e) env)])
+           (cond [(and (bool? v1) (bool? v2)) (bool (equal? (bool-b v1)  (bool-b v2)))]
+                 [(and (bool? v1) (num? v2))  (bool (equal? (bool-b v1)  (num-int v2)))]
+                 [(and (num? v1) (bool? v2))  (bool (equal? (num-int v1) (bool-b v2)))]
+                 [(and (num? v1) (num? v2))   (bool (equal? (num-int v1) (num-int v2)))]
                  [true (error "NUMEX iseq applied to non-boolean or non-number")])
            )]
         [(ifnzero? e) ; ** if n is zero, do e2 else e3
-         (let [v1 (eval-under-env (cnd-e1 e) env)]
+         (let [v1 (eval-under-env (ifnzero-e1 e) env)]
            (if [num? v1]
                [if (= (num-int v1) 0)
-                   (eval-under-env (cnd-e3 e) env)
-                   (eval-under-env (cnd-e2 e) env)]
+                   (eval-under-env (ifnzero-e3 e) env)
+                   (eval-under-env (ifnzero-e2 e) env)]
                [true (error "NUMEX ifnzero applied to non-number")])
            )]
-        [(ifleq? e) ; ** if n is zero, do e2 else e3
-         (let [v1 (eval-under-env (cnd-e1 e) env)]
-           (if [num? v1]
-               [if (= (num-int v1) 0)
-                   (eval-under-env (cnd-e3 e) env)
-                   (eval-under-env (cnd-e2 e) env)]
-               [true (error "NUMEX ifnzero applied to non-number")])
+        [(ifleq? e) ; ** if stricly
+         (let ([v1 (eval-under-env (ifleq-e1 e) env)]
+               [v2 (eval-under-env (ifleq-e2 e) env)])
+           (if [and (num? v1) (num? v2)]
+               [if [> v1 v2]
+                   [eval-under-env (ifleq-e4 e) env]
+                   [eval-under-env (ifleq-e3 e) env]]
+               [error "NUMEX ifleq applied to non-number"])
            )]
+        [(with? e)
+         (if [string? (with-s e)]
+             [eval-under-env (with-e2 e)
+                             (cons (var (with-s e)
+                                        (val-under-env (with-e1 e) env))
+                                   env)]
+             [error "NUMEX with appliedt to non-string"])]
+        [(apply? e)
+         (let [v1 (eval-under-env (apply-e1 e) env)]
+           [if (closure? v1)
+               ()
+               (error "Result of e1 is not closure")])] ; it needs to complete later
+        [(apair? e) ; ** apair
+         (let ([v1 (eval-under-env (apair-e1) env)]
+               [v2 (eval-under-env (apair-e2) env)])
+           (apair v1 v2))]
+        [(1st? e)  ; ** first element of a apair
+         (let [v1 (eval-under-env (1st-e e1) env)]
+           [if (apair? v1)
+               (apair-e1)
+               (error "e is not a apair:" v1)])]
+        [(2nd? e)  ; ** second element of a apair
+         (let [v1 (eval-under-env (2nd-e e1) env)]
+           [if (apair? v1)
+               (apair-e2)
+               (error "e is not a apair:" v1)])]
+        
         ;; CHANGE add more cases here
         [(string? e) e]
         [#t (error (format "bad NUMEX expression: ~v" e))]))
