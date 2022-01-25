@@ -4,6 +4,11 @@
 #lang racket
 (provide (all-defined-out)) ;; so we can put tests in a second file
 
+(define (extend-env s v env)
+  (if (null? (envlook env s))
+      (cons [var s v] env)
+      (error (format "variable +v is bound" s))))
+
 ;; definition of structures for NUMEX programs
 
 ;; CHANGE add the missing ones
@@ -185,7 +190,7 @@
          (if [string? (with-s e)]
              [eval-under-env (with-e2 e)
                              (cons (var (with-s e)
-                                        (val-under-env (with-e1 e) env))
+                                        (eval-under-env (with-e1 e) env))
                                    env)]
              [error "NUMEX with appliedt to non-string"])]
         [(apply? e)
@@ -198,15 +203,47 @@
                [v2 (eval-under-env (apair-e2) env)])
            (apair v1 v2))]
         [(1st? e)  ; ** first element of a apair
-         (let [v1 (eval-under-env (1st-e e1) env)]
+         (let [v1 (eval-under-env (1st-e1 e) env)]
            [if (apair? v1)
                (apair-e1)
                (error "e is not a apair:" v1)])]
         [(2nd? e)  ; ** second element of a apair
-         (let [v1 (eval-under-env (2nd-e e1) env)]
+         (let [v1 (eval-under-env (2nd-e1 e) env)]
            [if (apair? v1)
                (apair-e2)
                (error "e is not a apair:" v1)])]
+        [(ismunit? e)  ; ** is e a munit
+         (let [v1 (eval-under-env (ismunit-e1 e) env)]
+           [bool (munit? v1)]
+           )]
+        [(letrec? e)
+         (cond [(not(string? (letrec-s1 e))) (error "s1 is not a string:" (letrec-s1 e))]
+               [(not(string? (letrec-s2 e))) (error "s2 is not a string:" (letrec-s2 e))]
+               [(not(string? (letrec-s3 e))) (error "s3 is not a string:" (letrec-s3 e))]
+               [(not(string? (letrec-s4 e))) (error "s4 is not a string:" (letrec-s4 e))]
+               [#t (num 0)])] ; bug !!!!!!!!!!!!!!!!!!!!!!!!!!!!1111
+        [(key? e)
+         (if [string? (key-s e)]
+             [key (key-s e) (eval-under-env (key-e e) env)]
+             [error "NUMEX key applied to non-string"])]
+        [(record? e)
+         (let ([v1 (eval-under-env (record-k e) env)]
+               [v2 (eval-under-env (record-r e) env)])
+           (cond [(and (key? v1) (munit? v2)) (record v1 v2)]
+                 [(and (key? v1) (record? v2)) (record v1 v2)]
+                 [error "NUMEX record applied to non-string"]))
+         ]
+        [(value? e)
+         (let ([v1 (eval-under-env (value-s e) env)]
+               [v2 (eval-under-env (value-r e) env)])
+           (if [and (string? v1) (record? v2)]
+               [cond [(equal? v1 (key-s (record-k v2))) (key-e (record-k v2))]
+                     [(munit? (record-r v2)) (munit)]
+                     [#t (value (key-s (record-k v2)) (record-r v2))]
+                     ]))]
+        ))
+        
+         
         
         ;; CHANGE add more cases here
         [(string? e) e]
