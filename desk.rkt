@@ -74,13 +74,16 @@
 
 ;; Problem 2
 
-(define test-env (cons (var "fda") (cons (var "hello") (cons (var "nooo") null))))
+(define test-env (cons [cons (var "x") (num 4)]
+                       (cons [cons (var "hello") (num "name")]
+                             (cons [cons (var "isU") (bool #t)] null))))
+;(define test-env (cons (var "fda") (cons (var "hello") (cons (var "nooo") null))))
 
 ;; lookup a variable in an environment
 ;; Complete this function
 (define (envlookup env str)
   (cond [(null? env) (error "unbound variable during evaluation" str)]
-        [(equal? (var-string (car env)) str) (car env)]
+        [(equal? (var-string (car (car env))) str) (cdr (car env))]
         [true (envlookup [cdr env] str)]
         )
   )
@@ -105,6 +108,10 @@
              e
              [error "NUMEX var applied to non-boolean"])
          ]
+        [(munit? e)
+         e]
+        [(string? e)
+         e]
         [(plus? e) ; ** plus
          (let ([v1 (eval-under-env (plus-e1 e) env)]
                [v2 (eval-under-env (plus-e2 e) env)])
@@ -152,18 +159,18 @@
                (if (bool-b v1)
                    (let ([v2 (eval-under-env (andalso-e2 e) env)])
                         [if (bool? v2)
-                            (bool-b v2)
+                            v2
                             (error "NUMEX logical conjunction applied to non-boolean")])
                    (bool #f))
                (error "NUMEX logical conjunction applied to non-boolean")])]
         [(orelse? e) ; ** logical disjunction
-         (let ([v1 (eval-under-env (orelse-e1 e) env)]) ; [v2 (eval-under-env (andalso-e2 e) env)]
+         (let ([v1 (eval-under-env (orelse-e1 e) env)]) 
            [if (bool? v1)
                (if (bool-b v1)
                    (bool #t)
                    (let ([v2 (eval-under-env (orelse-e2 e) env)])
                         [if (bool? v2)
-                            (bool-b v2)
+                            v2
                             (error "NUMEX logical disjunction applied to non-boolean")]))
                (error "NUMEX logical disjunction applied to non-boolean")])]
         [(cnd? e) ; ** condition
@@ -182,7 +189,7 @@
                  [(and (num? v1) (num? v2))   (bool (equal? (num-int v1) (num-int v2)))]
                  [true (error "NUMEX iseq applied to non-boolean or non-number")])
            )]
-        [(ifnzero? e) ; ** if n is zero, do e2 else e3
+        [(ifnzero? e) ; ** if n is not zero, do e2 else e3
          (let ([v1 (eval-under-env (ifnzero-e1 e) env)])
            (if [num? v1]
                [if (= (num-int v1) 0)
@@ -194,36 +201,34 @@
          (let ([v1 (eval-under-env (ifleq-e1 e) env)]
                [v2 (eval-under-env (ifleq-e2 e) env)])
            (if [and (num? v1) (num? v2)]
-               [if [> v1 v2]
-                   [eval-under-env (ifleq-e4 e) env]
-                   [eval-under-env (ifleq-e3 e) env]]
+               [if [> (num-int v1)  (num-int v2)]
+                   [eval-under-env (ifleq-e3 e) env]
+                   [eval-under-env (ifleq-e4 e) env]]
                [error "NUMEX ifleq applied to non-number"])
            )]
-        [(with? e)
+        [(with? e) ; ** with
          (if [string? (with-s e)]
              [eval-under-env (with-e2 e)
-                             (cons (var (with-s e)
-                                        (eval-under-env (with-e1 e) env))
-                                   env)]
+                             (cons [cons (var (with-s e)) (eval-under-env (with-e1 e) env)] env)]
              [error "NUMEX with appliedt to non-string"])]
-        [(apply? e)
+        [(apply? e) ; ** apply
          (let ([v1 (eval-under-env (apply-e1 e) env)])
            [if (closure? v1)
                (#t)
                (error "Result of e1 is not closure")])] ; it needs to complete later
         [(apair? e) ; ** apair
-         (let ([v1 (eval-under-env (apair-e1) env)]
-               [v2 (eval-under-env (apair-e2) env)])
+         (let ([v1 (eval-under-env (apair-e1 e) env)]
+               [v2 (eval-under-env (apair-e2 e) env)])
            (apair v1 v2))]
         [(1st? e)  ; ** first element of a apair
          (let ([v1 (eval-under-env (1st-e1 e) env)])
            [if (apair? v1)
-               (apair-e1)
+               (apair-e1 v1)
                (error "e is not a apair:" v1)])]
         [(2nd? e)  ; ** second element of a apair
          (let ([v1 (eval-under-env (2nd-e1 e) env)])
            [if (apair? v1)
-               (apair-e2)
+               (apair-e2 v1)
                (error "e is not a apair:" v1)])]
         [(ismunit? e)  ; ** is e a munit
          (let ([v1 (eval-under-env (ismunit-e1 e) env)])
@@ -235,24 +240,24 @@
                [(not(string? (letrec-s3 e))) (error "s3 is not a string:" (letrec-s3 e))]
                [(not(string? (letrec-s4 e))) (error "s4 is not a string:" (letrec-s4 e))]
                [#t (num 0)])] ; bug !!!!!!!!!!!!!!!!!!!!!!!!!!!!1111
-        [(key? e)
+        [(key? e) ; ** key
          (if [string? (key-s e)]
              [key (key-s e) (eval-under-env (key-e e) env)]
              [error "NUMEX key applied to non-string"])]
-        [(record? e)
+        [(record? e) ; ** record
          (let ([v1 (eval-under-env (record-k e) env)]
                [v2 (eval-under-env (record-r e) env)])
            (cond [(and (key? v1) (munit? v2)) (record v1 v2)]
                  [(and (key? v1) (record? v2)) (record v1 v2)]
                  [error "NUMEX record applied to non-string"]))
          ]
-        [(value? e)
+        [(value? e) ; ** value
          (let ([v1 (eval-under-env (value-s e) env)]
                [v2 (eval-under-env (value-r e) env)])
            (if [and (string? v1) (record? v2)]
                [cond [(equal? v1 (key-s (record-k v2))) (key-e (record-k v2))]
                      [(munit? (record-r v2)) (munit)]
-                     [#t (value (key-s (record-k v2)) (record-r v2))]
+                     [#t (eval-under-env (value v1 (record-r v2)) env)]
                      ]
                [error "NUMEX value applied to non-string or non-record"]
                ))]
