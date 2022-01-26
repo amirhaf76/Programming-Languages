@@ -8,6 +8,7 @@
   (if (is-in-env env s)
       (error (format "variable +v is bound" s))
       (cons [cons (var s) (eval-under-env e env)] env)
+      ;(cons [cons (var s) e] env)
       ))
 
 (define (is-in-env env str)
@@ -432,3 +433,19 @@
 ;; Do NOT change
 (define (infer-exp e)
   (infer-under-env e null))
+
+
+;; Problem 4
+
+(define (ifmunit e1 e2 e3) (cnd [ismunit e1] e2 e3))
+
+(define (with* bs e2)
+  (if [null? bs]
+      e2
+      [let ([p (car bs)])
+        (with (car p) (cdr p) (with* (cdr bs) e2))
+        ]))
+
+
+(define (ifneq e1 e2 e3 e4)
+  (cnd (neg (iseq e1 e2)) e3 e4))
