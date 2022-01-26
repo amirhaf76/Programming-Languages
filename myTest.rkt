@@ -115,4 +115,4 @@
 (eval-under-env (value "r" (record (key "dafda" (plus (num 4) (num 5))) (record (key "ttt" (num 6)) (munit)))) test-env)
 
 (eval-under-env (lam "f" "x" (num (var "x"))) null)
-
+(eval-under-env (apply (lam "f" "x" (plus (num 8) (var "x"))) (num 3)) null)

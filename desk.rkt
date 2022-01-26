@@ -32,7 +32,7 @@
 (define (extend-type-env s v env)
   (if (is-in-env env s)
       (error (format "variable +v has a type" s))
-      (cons [cons (var s) v] env)
+      (cons [cons (var s) (infer-under-env v env)] env)
       ))
 
 (define (assign s e env)
@@ -90,6 +90,7 @@
 ;; Primitive types are: "int", "bool" and "null"
 (struct collection (type) #:transparent) ;; collection of a certain type, e.g., (collection "int")
 (struct function (input-type output-type) #:transparent) ;; e.g. (function ("int" int")) means fn f "int" -> "int"
+(struct tlam (s1 s2 type e) #:transparent)
 
 ;; Problem 1
 
@@ -134,12 +135,15 @@
         [(num? e)  ; ** num
          (if [number? (num-int e)]
              e
-             [error "NUMEX var applied to non-number"])
+             [error "NUMEX num applied to non-number"])
+         ]
+        [(closure? e)  ; ** closure
+         e
          ]
         [(bool? e) ; ** bool
          (if [boolean? (bool-b e)]
              e
-             [error "NUMEX var applied to non-boolean"])
+             [error "NUMEX bool applied to non-boolean"])
          ]
         [(munit? e)
          e]
@@ -413,6 +417,16 @@
                "bool"
                [error "NUMEX TYPE ERROR: ismunit applied to non-collection or null"]))
          ]
+        [(apply? e)
+         (let ([t1 (infer-under-env (apply-e1 e) env)]
+               [t2 (infer-under-env (apply-e2 e) env)])
+           (if [function? t1]
+               [if [equal? (function-input-type t1) t2]
+                   [function-output-type t1]
+                   [error "NUMEX TYPE ERROR: apply applied to non-" t2]
+                   ]
+               [error "NUMEX TYPE ERROR: apply applied to non-funtion type"]
+               ))]    
         [#t (error (format "bad NUMEX expression: ~v" e))]))
 
 ;; Do NOT change
