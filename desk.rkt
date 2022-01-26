@@ -16,6 +16,25 @@
         [true (is-in-env [cdr env] str)]
         ))
 
+(define (append x xs)
+  (cond [(null? xs) (cons x null)]
+        [(null? (cdr xs)) (cons (car xs) (cons x null))]
+        [#t (cons (car xs) (append x (cdr xs)))]
+        ))
+
+(define (append-env env1 env2)
+  (cond [(and (null? env1) (null? env2)) null]
+        [(null? env1) env2]
+        [(null? env2) env1]
+        [(null? (cdr env1)) (append (car env1) env2)]
+        [#t (append-env (cdr env1) (append (car env1) env2))]))
+
+(define (extend-type-env s v env)
+  (if (is-in-env env s)
+      (error (format "variable +v has a type" s))
+      (cons [cons (var s) v] env)
+      ))
+
 ;; definition of structures for NUMEX programs
 
 ;; CHANGE add the missing ones
@@ -275,3 +294,96 @@
 (define (eval-exp e)
   (eval-under-env e null))
 
+;; Problem 3
+;; Complete more cases for other kinds of NUMEX expressions.
+;; We will test infer-under-env by calling its helper function, infer-exp.
+(define (infer-under-env e env)
+  (cond [(var? e) ; ** var
+         (infer-under-env (envlookup env (var-string e)) env)
+         ]
+        [(num? e) ; ** num
+         (cond
+           [(integer? (num-int e)) "int"]
+           [#t (error "NUMEX TYPE ERROR: num should be a constant number")])
+         ]
+        [(bool? e) ; ** bool
+         (cond [(boolean? (bool-b e)) "bool"]
+               [#t (error "NUMEX TYPE ERROR: bool should be #t or #f")])
+         ]
+        [(munit? e) ; ** munit
+         "null"]
+        [(string? e) ; ** string
+         "string"]
+        [(plus? e) ; ** plus
+         (let ([t1 (infer-under-env (plus-e1 e) env)]
+               [t2 (infer-under-env (plus-e2 e) env)])
+           (if (and (equal? "int" t1)
+                    (equal? "int" t2))
+               "int"
+               (error "NUMEX TYPE ERROR: addition applied to non-integer")))
+         ]
+        [(andalso? e) ; ** conjunction
+         (let ([t1 (infer-under-env (andalso-e1 e) env)]
+               [t2 (infer-under-env (andalso-e2 e) env)])
+           (if (and (equal? "bool" t1)
+                    (equal? "bool" t2))
+               "bool"
+               (error "NUMEX TYPE ERROR: conjunction applied to non-boolean")))
+         ]
+        [(neg? e) ; ** negation
+         (infer-under-env (neg-e1 e) env)
+         ]
+        [(cnd? e) ; ** condition
+         (let ([t1 (infer-under-env (cnd-e1 e) env)])
+           (if (equal? "bool" t1)
+               (let ([t2 (infer-under-env (cnd-e2 e) env)]
+                     [t3 (infer-under-env (cnd-e3 e) env)])
+                 (if (equal? t1 t2)
+                     t1
+                     (error "NUMEX TYPE ERROR: output of cnd aren't same type"))
+                 )
+               (error "NUMEX TYPE ERROR: cnd applied to non-boolean")))
+         ]
+        [(iseq? e) ; ** iseq
+         (let ([t1 (infer-under-env (iseq-e1 e) env)]
+               [t2 (infer-under-env (iseq-e2 e) env)])
+           (if (equal? t1 t2)
+                     "bool"
+                     (error "NUMEX TYPE ERROR: output of cnd aren't same type"))
+           )
+         ]
+        [(with? e) ; ** with
+         (infer-under-env (with-e2 e) (extend-type-env (with-s e) (with-e1 e) env))
+         ]
+        [(apair? e) ; ** apair
+         (let ([t1 (infer-under-env (apair-e1 e) env)]
+               [t2 (infer-under-env (apair-e2 e) env)])
+           (if [or (equal? t2 (collection t1))
+                   (equal? t2 "null")]
+               [collection t1]
+               [error "NUMEX TYPE ERROR: t2 is not type of t1 or null"])
+           )]
+        [(1st? e) ; ** 1st
+         (let ([t1 (infer-under-env (1st-e1 e) env)])
+           (if [collection? t1]
+               [collection-type t1]
+               [error "NUMEX TYPE ERROR: 1st applied to non-collection"]))
+         ]
+        [(2nd? e) ; ** 2nd
+         (let ([t1 (infer-under-env (2nd-e1 e) env)])
+           (if [collection? t1]
+               t1
+               [error "NUMEX TYPE ERROR: 2st applied to non-collection"]))
+         ]
+        [(ismunit? e) ; ** ismunit
+         (let ([t1 (infer-under-env (ismunit-e1 e) env)])
+           (if [or (collection? t1)
+                   (equal? "null")]
+               "bool"
+               [error "NUMEX TYPE ERROR: ismunit applied to non-collection or null"]))
+         ]
+        [#t (error (format "bad NUMEX expression: ~v" e))]))
+
+;; Do NOT change
+(define (infer-exp e)
+  (infer-under-env e null))

@@ -4,20 +4,27 @@
 #lang racket
 (provide (all-defined-out)) ;; so we can put tests in a second file
 
-(define (extend-env s v env)
-  (if (null? (envlook env s))
-      (cons [var s v] env)
-      (error (format "variable +v is bound" s))))
+(define (extend-env s e env)
+  (if (is-in-env env s)
+      (error (format "variable +v is bound" s))
+      (cons [cons (var s) (eval-under-env e env)] env)
+      ))
+
+(define (is-in-env env str)
+  (cond [(null? env) #f]
+        [(equal? (var-string (car (car env))) str) #t]
+        [true (is-in-env [cdr env] str)]
+        ))
 
 ;; definition of structures for NUMEX programs
 
 ;; CHANGE add the missing ones
 
-(struct var  (string value)   #:transparent)  ;; a variable, e.g., (var "foo")
+(struct var  (string)   #:transparent)  ;; a variable, e.g., (var "foo")
 (struct num  (int)      #:transparent)  ;; a constant number, e.g., (num 17)
 (struct bool  (b)       #:transparent)  ;; a boolean
 (struct plus  (e1 e2)   #:transparent)  ;; add two expressions
-(struct munus (e1 e2)   #:transparent)  ;; subtract two expressions
+(struct minus (e1 e2)   #:transparent)  ;; subtract two expressions
 (struct mult (e1 e2)    #:transparent)  ;; multiplication two expressions
 (struct div (e1 e2)     #:transparent)  ;; division two expressions
 (struct neg (e1)        #:transparent)  ;; negation one expression
@@ -74,25 +81,44 @@
 
 ;; Problem 2
 
+(define test-env (cons [cons (var "x") (num 4)]
+                       (cons [cons (var "hello") (num "name")]
+                             (cons [cons (var "isU") (bool #t)] null))))
+;(define test-env (cons (var "fda") (cons (var "hello") (cons (var "nooo") null))))
+
 ;; lookup a variable in an environment
 ;; Complete this function
 (define (envlookup env str)
   (cond [(null? env) (error "unbound variable during evaluation" str)]
-        [(equal? (var-string (car env)) str) (car env)]
+        [(equal? (var-string (car (car env))) str) (cdr (car env))]
         [true (envlookup [cdr env] str)]
         )
   )
 
+
 ;; Complete more cases for other kinds of NUMEX expressions.
 ;; We will test eval-under-env by calling it directly even though
 ;; "in real life" it would be a helper function of eval-exp.
-(define (eval-under-env e env)
+(define (eval-under-env e env) ; (eval-under-env () test-env)
   (cond [(var? e)  ; ** var
-         (envlookup env (var-string e))]
+         (if [string? (var-string e)]
+             [envlookup env (var-string e)]
+             [error "NUMEX var applied to non-string"])
+         ]
         [(num? e)  ; ** num
-         (e)]
+         (if [number? (num-int e)]
+             e
+             [error "NUMEX var applied to non-number"])
+         ]
         [(bool? e) ; ** bool
-         (e)]
+         (if [boolean? (bool-b e)]
+             e
+             [error "NUMEX var applied to non-boolean"])
+         ]
+        [(munit? e)
+         e]
+        [(string? e)
+         e]
         [(plus? e) ; ** plus
          (let ([v1 (eval-under-env (plus-e1 e) env)]
                [v2 (eval-under-env (plus-e2 e) env)])
@@ -120,41 +146,42 @@
         [(div? e) ; ** div
          (let ([v1 (eval-under-env (div-e1 e) env)]
                [v2 (eval-under-env (div-e2 e) env)])
-           (cond [(num? v2) (if (= 0 v2)
-                                     (error "NUMEX devide by zero")
-                                     [(and (num? v1) (num? v2))
-                                      (num (/ (num-int v1) (num-int v2)))]
-                                     )]
-                 [true (error "NUMEX division applied to non-number")]
+           (if (and (num? v1)
+                    (num? v2))
+               (if (= 0 (num-int v2))
+                   (error "NUMEX devide by zero")
+                   (num (/ (num-int v1) (num-int v2)))
+                   )
+               (error "NUMEX division applied to non-number")
                  ))]
         [(neg? e) ; ** negation
          (let ([v1 (eval-under-env (neg-e1 e) env)])
            (cond [(bool? v1) (bool (not (bool-b v1)))]
                  [(num? v1) (num (* (num-int v1) -1))]
-                 [true (error "NUMEX negation applied to non-boolean")]
+                 [true (error "NUMEX negation applied to non-boolean or non-number")]
                  ))]
         [(andalso? e) ; ** logical conjunction
-         (let [v1 (eval-under-env (andalso-e1 e) env)] ; [v2 (eval-under-env (andalso-e2 e) env)]
+         (let ([v1 (eval-under-env (andalso-e1 e) env)])
            [if (bool? v1)
                (if (bool-b v1)
-                   (let [v2 (eval-under-env (andalso-e2 e) env)]
+                   (let ([v2 (eval-under-env (andalso-e2 e) env)])
                         [if (bool? v2)
-                            (bool-b v2)
+                            v2
                             (error "NUMEX logical conjunction applied to non-boolean")])
                    (bool #f))
                (error "NUMEX logical conjunction applied to non-boolean")])]
         [(orelse? e) ; ** logical disjunction
-         (let [v1 (eval-under-env (orelse-e1 e) env)] ; [v2 (eval-under-env (andalso-e2 e) env)]
+         (let ([v1 (eval-under-env (orelse-e1 e) env)]) 
            [if (bool? v1)
                (if (bool-b v1)
                    (bool #t)
-                   (let [v2 (eval-under-env (orelse-e2 e) env)]
+                   (let ([v2 (eval-under-env (orelse-e2 e) env)])
                         [if (bool? v2)
-                            (bool-b v2)
+                            v2
                             (error "NUMEX logical disjunction applied to non-boolean")]))
                (error "NUMEX logical disjunction applied to non-boolean")])]
         [(cnd? e) ; ** condition
-         (let [v1 (eval-under-env (cnd-e1 e) env)]
+         (let ([v1 (eval-under-env (cnd-e1 e) env)])
            (if (bool? v1)
                (if (bool-b v1)
                    (eval-under-env (cnd-e2 e) env)
@@ -169,8 +196,8 @@
                  [(and (num? v1) (num? v2))   (bool (equal? (num-int v1) (num-int v2)))]
                  [true (error "NUMEX iseq applied to non-boolean or non-number")])
            )]
-        [(ifnzero? e) ; ** if n is zero, do e2 else e3
-         (let [v1 (eval-under-env (ifnzero-e1 e) env)]
+        [(ifnzero? e) ; ** if n is not zero, do e2 else e3
+         (let ([v1 (eval-under-env (ifnzero-e1 e) env)])
            (if [num? v1]
                [if (= (num-int v1) 0)
                    (eval-under-env (ifnzero-e3 e) env)
@@ -181,39 +208,37 @@
          (let ([v1 (eval-under-env (ifleq-e1 e) env)]
                [v2 (eval-under-env (ifleq-e2 e) env)])
            (if [and (num? v1) (num? v2)]
-               [if [> v1 v2]
-                   [eval-under-env (ifleq-e4 e) env]
-                   [eval-under-env (ifleq-e3 e) env]]
+               [if [> (num-int v1)  (num-int v2)]
+                   [eval-under-env (ifleq-e3 e) env]
+                   [eval-under-env (ifleq-e4 e) env]]
                [error "NUMEX ifleq applied to non-number"])
            )]
-        [(with? e)
+        [(with? e) ; ** with
          (if [string? (with-s e)]
              [eval-under-env (with-e2 e)
-                             (cons (var (with-s e)
-                                        (eval-under-env (with-e1 e) env))
-                                   env)]
+                             (extend-env (with-s e) (with-e1 e) env)]
              [error "NUMEX with appliedt to non-string"])]
-        [(apply? e)
-         (let [v1 (eval-under-env (apply-e1 e) env)]
+        [(apply? e) ; ** apply
+         (let ([v1 (eval-under-env (apply-e1 e) env)])
            [if (closure? v1)
-               ()
+               (#t)
                (error "Result of e1 is not closure")])] ; it needs to complete later
         [(apair? e) ; ** apair
-         (let ([v1 (eval-under-env (apair-e1) env)]
-               [v2 (eval-under-env (apair-e2) env)])
+         (let ([v1 (eval-under-env (apair-e1 e) env)]
+               [v2 (eval-under-env (apair-e2 e) env)])
            (apair v1 v2))]
         [(1st? e)  ; ** first element of a apair
-         (let [v1 (eval-under-env (1st-e1 e) env)]
+         (let ([v1 (eval-under-env (1st-e1 e) env)])
            [if (apair? v1)
-               (apair-e1)
+               (apair-e1 v1)
                (error "e is not a apair:" v1)])]
         [(2nd? e)  ; ** second element of a apair
-         (let [v1 (eval-under-env (2nd-e1 e) env)]
+         (let ([v1 (eval-under-env (2nd-e1 e) env)])
            [if (apair? v1)
-               (apair-e2)
+               (apair-e2 v1)
                (error "e is not a apair:" v1)])]
         [(ismunit? e)  ; ** is e a munit
-         (let [v1 (eval-under-env (ismunit-e1 e) env)]
+         (let ([v1 (eval-under-env (ismunit-e1 e) env)])
            [bool (munit? v1)]
            )]
         [(letrec? e)
@@ -222,31 +247,28 @@
                [(not(string? (letrec-s3 e))) (error "s3 is not a string:" (letrec-s3 e))]
                [(not(string? (letrec-s4 e))) (error "s4 is not a string:" (letrec-s4 e))]
                [#t (num 0)])] ; bug !!!!!!!!!!!!!!!!!!!!!!!!!!!!1111
-        [(key? e)
+        [(key? e) ; ** key
          (if [string? (key-s e)]
              [key (key-s e) (eval-under-env (key-e e) env)]
              [error "NUMEX key applied to non-string"])]
-        [(record? e)
+        [(record? e) ; ** record
          (let ([v1 (eval-under-env (record-k e) env)]
                [v2 (eval-under-env (record-r e) env)])
            (cond [(and (key? v1) (munit? v2)) (record v1 v2)]
                  [(and (key? v1) (record? v2)) (record v1 v2)]
                  [error "NUMEX record applied to non-string"]))
          ]
-        [(value? e)
+        [(value? e) ; ** value
          (let ([v1 (eval-under-env (value-s e) env)]
                [v2 (eval-under-env (value-r e) env)])
            (if [and (string? v1) (record? v2)]
                [cond [(equal? v1 (key-s (record-k v2))) (key-e (record-k v2))]
                      [(munit? (record-r v2)) (munit)]
-                     [#t (value (key-s (record-k v2)) (record-r v2))]
-                     ]))]
-        ))
-        
-         
-        
+                     [#t (eval-under-env (value v1 (record-r v2)) env)]
+                     ]
+               [error "NUMEX value applied to non-string or non-record"]
+               ))]
         ;; CHANGE add more cases here
-        [(string? e) e]
         [#t (error (format "bad NUMEX expression: ~v" e))]))
 
 ;; Do NOT change

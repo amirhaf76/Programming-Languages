@@ -6,6 +6,9 @@
 (define test-env (cons [cons (var "x") (num 4)]
                        (cons [cons (var "hello") (num "name")]
                              (cons [cons (var "isU") (bool #t)] null))))
+(define test-env2 (cons [cons (var "x") (num 78)]
+                       (cons [cons (var "hello") (num "name2")]
+                             (cons [cons (var "isUr") (bool #t)] null))))
 (define (extend-env s e env)
   (if (is-in-env env s)
       (error (format "variable +v is bound" s))
@@ -17,6 +20,25 @@
         [(equal? (var-string (car (car env))) str) #t]
         [true (is-in-env [cdr env] str)]
         ))
+
+(define (append x xs)
+  (cond [(null? xs) (cons x null)]
+        [(null? (cdr xs)) (cons (car xs) (cons x null))]
+        [#t (cons (car xs) (append x (cdr xs)))]
+        ))
+
+(define (append-env env1 env2)
+  (cond [(and (null? env1) (null? env2)) null]
+        [(null? env1) env2]
+        [(null? env2) env1]
+        [(null? (cdr env1)) (append (car env1) env2)]
+        [#t (append-env (cdr env1) (append (car env1) env2))]))
+
+(append 1 `())
+(append 3 `(4 5 5 dfkg "sfa" a))
+(append-env `(4 5 5 dfkg "sfa" a) `(4r er g 56))
+(append-env test-env test-env2)
+
 
 ;(extend-env "hello" (eval-under-env (plus (num 4) (num 5)) test-env) test-env)
 (extend-env "yy" (eval-under-env (plus (num 4) (num 5)) test-env) test-env)
