@@ -3,6 +3,23 @@
 (require "desk.rkt")
 
 ;(define test-env (cons (var "fda") (cons (var "hello") (cons (var "nooo") null))))
+(define test-env (cons [cons (var "x") (num 4)]
+                       (cons [cons (var "hello") (num "name")]
+                             (cons [cons (var "isU") (bool #t)] null))))
+(define (extend-env s e env)
+  (if (is-in-env env s)
+      (error (format "variable +v is bound" s))
+      (cons [cons (var s) (eval-under-env e env)] env)
+      ))
+
+(define (is-in-env env str)
+  (cond [(null? env) #f]
+        [(equal? (var-string (car (car env))) str) #t]
+        [true (is-in-env [cdr env] str)]
+        ))
+
+;(extend-env "hello" (eval-under-env (plus (num 4) (num 5)) test-env) test-env)
+(extend-env "yy" (eval-under-env (plus (num 4) (num 5)) test-env) test-env)
 
 (eval-under-env (var "hello") test-env)
 ;(eval-under-env (var #t) test-env)
@@ -50,6 +67,7 @@
 (eval-under-env (ifleq (num 5) (num 5.5) (var "hello") (bool #t)) test-env)
 
 (eval-under-env (with "v1" (num 3) (plus (var "v1") (num 2))) test-env)
+(eval-under-env (with "v2" (num 3) (with "v1" (num 3) (plus (var "v1") (var "v2")))) test-env)
 
 (eval-under-env (apair (num 3) (var "hello")) test-env)
 

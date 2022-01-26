@@ -4,10 +4,17 @@
 #lang racket
 (provide (all-defined-out)) ;; so we can put tests in a second file
 
-(define (extend-env s v env)
-  (if (null? (envlookup env s))
-      (cons [var s v] env)
-      (error (format "variable +v is bound" s))))
+(define (extend-env s e env)
+  (if (is-in-env env s)
+      (error (format "variable +v is bound" s))
+      (cons [cons (var s) (eval-under-env e env)] env)
+      ))
+
+(define (is-in-env env str)
+  (cond [(null? env) #f]
+        [(equal? (var-string (car (car env))) str) #t]
+        [true (is-in-env [cdr env] str)]
+        ))
 
 ;; definition of structures for NUMEX programs
 
@@ -209,7 +216,7 @@
         [(with? e) ; ** with
          (if [string? (with-s e)]
              [eval-under-env (with-e2 e)
-                             (cons [cons (var (with-s e)) (eval-under-env (with-e1 e) env)] env)]
+                             (extend-env (with-s e) (with-e1 e) env)]
              [error "NUMEX with appliedt to non-string"])]
         [(apply? e) ; ** apply
          (let ([v1 (eval-under-env (apply-e1 e) env)])
