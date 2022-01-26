@@ -34,6 +34,13 @@
         [(null? (cdr env1)) (append (car env1) env2)]
         [#t (append-env (cdr env1) (append (car env1) env2))]))
 
+(define (assign s e env)
+  (cond [(null? env) null]
+        [(equal? s (var-string (car(car env)))) (cons (cons (var s) e) (cdr env))]
+        [#t (cons (car env)
+                  (assign s e (cdr env)))]
+        ))
+
 (append 1 `())
 (append 3 `(4 5 5 dfkg "sfa" a))
 (append-env `(4 5 5 dfkg "sfa" a) `(4r er g 56))
@@ -106,4 +113,6 @@
 (eval-under-env (value "ttt" (record (key "dafda" (plus (num 4) (num 5))) (record (key "ttt" (num 6)) (munit)))) test-env)
 (eval-under-env (value "dafda" (record (key "dafda" (plus (num 4) (num 5))) (record (key "ttt" (num 6)) (munit)))) test-env)
 (eval-under-env (value "r" (record (key "dafda" (plus (num 4) (num 5))) (record (key "ttt" (num 6)) (munit)))) test-env)
+
+(eval-under-env (lam "f" "x" (num (var "x"))) null)
 

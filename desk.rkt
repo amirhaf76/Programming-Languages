@@ -35,6 +35,13 @@
       (cons [cons (var s) v] env)
       ))
 
+(define (assign s e env)
+  (cond [(null? env) null]
+        [(equal? s (var-string (car(car env)))) (cons (cons (var s) e) (cdr env))]
+        [#t (cons (car env)
+                  (assign s e (cdr env)))]
+        ))
+
 ;; definition of structures for NUMEX programs
 
 ;; CHANGE add the missing ones
@@ -236,12 +243,36 @@
          (if [string? (with-s e)]
              [eval-under-env (with-e2 e)
                              (extend-env (with-s e) (with-e1 e) env)]
-             [error "NUMEX with appliedt to non-string"])]
+             [error "NUMEX with applied to non-string"])]
+        [(lam? e)
+         (cond [(and (string? (lam-s1 e))
+                     (string? (lam-s2 e))) (closure (cons [cons (var (lam-s1 e))
+                                                               e]
+                                                         [cons [cons (var (lam-s2 e))
+                                                                     (munit)]
+                                                               env]
+                                                         )
+                                                   e)]
+               [(and (null? (lam-s1 e))
+                     (string? (lam-s2 e))) (closure (cons [cons (var (lam-s2 e))
+                                                                (munit)]
+                                                          env)
+                                                    e)]
+               [#t (error "NUMEX lam applied to non-string")]
+             )]
         [(apply? e) ; ** apply
          (let ([v1 (eval-under-env (apply-e1 e) env)])
            [if (closure? v1)
-               (#t)
-               (error "Result of e1 is not closure")])] ; it needs to complete later
+               (eval-under-env (lam-e (closure-f v1))
+                               (append-env env
+                                           (assign (lam-s2 (closure-f v1))
+                                                   (eval-under-env (apply-e2 e) env)
+                                                   (closure-env v1)
+                                                   )
+                                           )
+                               )
+               (error "Result of e1 is not closure")]
+           )]
         [(apair? e) ; ** apair
          (let ([v1 (eval-under-env (apair-e1 e) env)]
                [v2 (eval-under-env (apair-e2 e) env)])
