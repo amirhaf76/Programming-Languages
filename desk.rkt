@@ -8,6 +8,7 @@
   (if (is-in-env env s)
       (error (format "variable +v is bound" s))
       (cons [cons (var s) (eval-under-env e env)] env)
+      ;(cons [cons (var s) e] env)
       ))
 
 (define (is-in-env env str)
@@ -275,7 +276,16 @@
                                                    )
                                            )
                                )
-               (error "Result of e1 is not closure")]
+               (if (lam? v1)
+                   (let ([v2 (eval-under-env v1 env)]) (eval-under-env (lam-e (closure-f v2))
+                                   (append-env env
+                                               (assign (lam-s2 (closure-f v2))
+                                                       (eval-under-env (apply-e2 e) env)
+                                                       (closure-env v2)
+                                                   )
+                                           )
+                               ))
+                   (error "Result of e1 is not closure"))]
            )]
         [(apair? e) ; ** apair
          (let ([v1 (eval-under-env (apair-e1 e) env)]
@@ -433,39 +443,44 @@
 (define (infer-exp e)
   (infer-under-env e null))
 
+
 ;; Problem 4
 
-(define (ifmunit e1 e2 e3) "CHANGE")
+(define (ifmunit e1 e2 e3) (cnd [ismunit e1] e2 e3))
 
-(define (with* bs e2) "CHANGE")
+(define (with* bs e2)
+  (if [null? bs]
+      e2
+      [let ([p (car bs)])
+        (with (car p) (cdr p) (with* (cdr bs) e2))
+        ]))
 
-(define (ifneq e1 e2 e3 e4) "CHANGE")
+
+(define (ifneq e1 e2 e3 e4)
+  (cnd (neg (iseq e1 e2)) e3 e4))
 
 ;; Problem 5
 
-(define numex-filter "CHANGE")
+(define numex-filter (lam null
+                          "nexfilter"
+                          (lam "f"
+                               "list"
+                               (cnd [ismunit (var "list")]
+                                    [munit]
+                                    (ifnzero [apply (var "nexfilter") (1st (var "list"))]
+                                             [apair (apply (var "nexfilter") (1st (var "list")))
+                                                         (apply (var "f") (2nd (var "list")))]
+                                             [apply (var "f") (2nd(var "list"))]
+                                         ) 
+                                    )
+                          )))
 
 (define numex-all-gt
   (with "filter" numex-filter
-        "CHANGE (notice filter is now in NUMEX scope)"))
-
-;; Problem 6
-
-(define type-error-but-evaluates-ok "CHANGE")
-(define type-ok-but-evaluates-error "CHANGE")
-
-;; Challenge Problem
-
-(struct fun-challenge (nameopt formal body freevars) #:transparent) ;; a recursive(?) 1-argument function
-
-;; We will test this function directly, so it must do
-;; as described in the assignment
-(define (compute-free-vars e) "CHANGE")
-
-;; Do NOT share code with eval-under-env because that will make grading
-;; more difficult, so copy most of your interpreter here and make minor changes
-(define (eval-under-env-c e env) "CHANGE")
-
-;; Do NOT change this
-(define (eval-exp-c e)
-  (eval-under-env-c (compute-free-vars e) null))
+        (lam null "i" (apply (var "filter") (lam "h"
+                    "n"
+                    (ifleq [var "i"]
+                           [var "n"]
+                           [num 0]
+                           [var "n"]))
+                             ))))
