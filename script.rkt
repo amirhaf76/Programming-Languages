@@ -33,32 +33,39 @@
 (eval-under-env (ifneq (num 71) (num 5) (num 7) (num 6)) null)
 ;; ====================================================================
 
-(define filter
-  (lam "f"
-       "arg"
-       (cnd [ismunit (var "arg")]
-            [munit]
-            [cnd (ismunit (2nd (var "arg")))
-                 (apair (apply (var "arg1") (1st (var "arg"))) (munit))
-                 (apair (apply (var "arg1") (1st (var "arg"))) (apply (var "f") (2nd (var "arg"))))]
-            ))
-       )
+
 
 (define numex-filter (lam null
-                          "arg1"
+                          "nexfilter"
                           (lam "f"
-                               "arg"
-                               (cnd [ismunit (var "arg")]
+                               "list"
+                               (cnd [ismunit (var "list")]
                                     [munit]
-                                    [cnd (ismunit (2nd (var "arg")))
-                                         (apair (apply (var "arg1") (1st (var "arg"))) (munit))
-                                         (apair (apply (var "arg1") (1st (var "arg"))) (apply (var "f") (2nd (var "arg"))))]
-                                    ))
-                          ))
+                                    (ifnzero [apply (var "nexfilter") (1st (var "list"))]
+                                             [apair (apply (var "nexfilter") (1st (var "list")))
+                                                         (apply (var "f") (2nd (var "list")))]
+                                             [apply (var "f") (2nd(var "list"))]
+                                         ) 
+                                    )
+                          )))
 
 
 
 (define test-list (apair (num 3) (apair (num 8) (munit))))
 (define test-list2 (apair (num 8) (munit)))
 
-(eval-exp (apply (apply numex-filter (lam null "x" (neg (var "x")))) test-list2))
+(eval-exp (apply (apply numex-filter (lam null "x" (neg (var "x")))) test-list))
+
+
+(define numex-all-gt
+  (with "filter" numex-filter
+        (lam null "i" (apply (var "filter") (lam "h"
+                    "n"
+                    (ifleq [var "i"]
+                           [var "n"]
+                           [num 0]
+                           [var "n"]))
+                             ))))
+
+(eval-exp (apply (apply numex-all-gt (num 4)) test-list))
+

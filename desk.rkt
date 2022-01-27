@@ -462,17 +462,25 @@
 ;; Problem 5
 
 (define numex-filter (lam null
-                          "arg1"
+                          "nexfilter"
                           (lam "f"
-                               "arg"
-                               (cnd [ismunit (var "arg")]
+                               "list"
+                               (cnd [ismunit (var "list")]
                                     [munit]
-                                    [cnd (ismunit (2nd (var "arg")))
-                                         (apair (apply (var "arg1") (1st (var "arg"))) (munit))
-                                         (apair (apply (var "arg1") (1st (var "arg"))) (apply (var "f") (2nd (var "arg"))))]
-                                    ))
-                          ))
+                                    (ifnzero [apply (var "nexfilter") (1st (var "list"))]
+                                             [apair (apply (var "nexfilter") (1st (var "list")))
+                                                         (apply (var "f") (2nd (var "list")))]
+                                             [apply (var "f") (2nd(var "list"))]
+                                         ) 
+                                    )
+                          )))
 
 (define numex-all-gt
   (with "filter" numex-filter
-        "CHANGE (notice filter is now in NUMEX scope)"))
+        (lam null "i" (apply (var "filter") (lam "h"
+                    "n"
+                    (ifleq [var "i"]
+                           [var "n"]
+                           [num 0]
+                           [var "n"]))
+                             ))))
