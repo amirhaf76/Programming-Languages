@@ -276,7 +276,16 @@
                                                    )
                                            )
                                )
-               (error "Result of e1 is not closure")]
+               (if (lam? v1)
+                   (let ([v2 (eval-under-env v1 env)]) (eval-under-env (lam-e (closure-f v2))
+                                   (append-env env
+                                               (assign (lam-s2 (closure-f v2))
+                                                       (eval-under-env (apply-e2 e) env)
+                                                       (closure-env v2)
+                                                   )
+                                           )
+                               ))
+                   (error "Result of e1 is not closure"))]
            )]
         [(apair? e) ; ** apair
          (let ([v1 (eval-under-env (apair-e1 e) env)]
@@ -449,3 +458,21 @@
 
 (define (ifneq e1 e2 e3 e4)
   (cnd (neg (iseq e1 e2)) e3 e4))
+
+;; Problem 5
+
+(define numex-filter (lam null
+                          "arg1"
+                          (lam "f"
+                               "arg"
+                               (cnd [ismunit (var "arg")]
+                                    [munit]
+                                    [cnd (ismunit (2nd (var "arg")))
+                                         (apair (apply (var "arg1") (1st (var "arg"))) (munit))
+                                         (apair (apply (var "arg1") (1st (var "arg"))) (apply (var "f") (2nd (var "arg"))))]
+                                    ))
+                          ))
+
+(define numex-all-gt
+  (with "filter" numex-filter
+        "CHANGE (notice filter is now in NUMEX scope)"))
