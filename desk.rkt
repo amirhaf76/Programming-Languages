@@ -5,11 +5,11 @@
 (provide (all-defined-out)) ;; so we can put tests in a second file
 
 (define (extend-env s e env)
-  (if (is-in-env env s)
-      (error (format "variable +v is bound" s))
+  ;(if (is-in-env env s)
+      ;(error (error "variable is bound" s))
       (cons [cons (var s) (eval-under-env e env)] env)
       ;(cons [cons (var s) e] env)
-      ))
+      );)
 
 (define (is-in-env env str)
   (cond [(null? env) #f]
@@ -33,7 +33,7 @@
 (define (extend-type-env s v env)
   (if (is-in-env env s)
       (error (format "variable +v has a type" s))
-      (cons [cons (var s) (infer-under-env v env)] env)
+      (cons [cons (var s) v] env)
       ))
 
 (define (assign s e env)
@@ -149,8 +149,6 @@
         [(munit? e) ; ** munit
          e]
         [(string? e) ; ** string
-         e]
-        [(list? e)
          e]
         [(plus? e) ; ** plus
          (let ([v1 (eval-under-env (plus-e1 e) env)]
@@ -316,7 +314,11 @@
                [(not(string? (letrec-s2 e))) (error "s2 is not a string:" (letrec-s2 e))]
                [(not(string? (letrec-s3 e))) (error "s3 is not a string:" (letrec-s3 e))]
                [(not(string? (letrec-s4 e))) (error "s4 is not a string:" (letrec-s4 e))]
-               [#t (num 0)])] ; bug !!!!!!!!!!!!!!!!!!!!!!!!!!!!1111
+               [#t (eval-under-env (letrec-e5 e) (append-env (list (cons (var (letrec-s1 e))  (letrec-e1 e))
+                                                                   (cons (var (letrec-s2 e))  (letrec-e2 e))
+                                                                   (cons (var (letrec-s3 e))  (letrec-e3 e))
+                                                                   (cons (var (letrec-s4 e))  (letrec-e4 e))) env))
+                   ])]
         [(key? e) ; ** key
          (if [string? (key-s e)]
              [key (key-s e) (eval-under-env (key-e e) env)]
@@ -350,7 +352,8 @@
 ;; We will test infer-under-env by calling its helper function, infer-exp.
 (define (infer-under-env e env)
   (cond [(var? e) ; ** var
-         (infer-under-env (envlookup env (var-string e)) env)
+         ;(infer-under-env (envlookup env (var-string e)) env)
+         (envlookup env (var-string e))
          ]
         [(num? e) ; ** num
          (cond
@@ -382,15 +385,19 @@
                (error "NUMEX TYPE ERROR: conjunction applied to non-boolean")))
          ]
         [(neg? e) ; ** negation
-         (infer-under-env (neg-e1 e) env)
+         (let ([t1 (infer-under-env (neg-e1 e) env)])
+           (if [or (equal? t1 "bool")
+                   (equal? t1 "int")]
+               t1
+               [error "NUMEX TYPE ERROR: negation applied to non-boolean and non-integer"]))
          ]
         [(cnd? e) ; ** condition
          (let ([t1 (infer-under-env (cnd-e1 e) env)])
            (if (equal? "bool" t1)
                (let ([t2 (infer-under-env (cnd-e2 e) env)]
                      [t3 (infer-under-env (cnd-e3 e) env)])
-                 (if (equal? t1 t2)
-                     t1
+                 (if (equal? t2 t3)
+                     t2
                      (error "NUMEX TYPE ERROR: output of cnd aren't same type"))
                  )
                (error "NUMEX TYPE ERROR: cnd applied to non-boolean")))
@@ -404,7 +411,9 @@
            )
          ]
         [(with? e) ; ** with
-         (infer-under-env (with-e2 e) (extend-type-env (with-s e) (with-e1 e) env))
+         (infer-under-env (with-e2 e) (extend-type-env (with-s e)
+                                                       (infer-under-env (with-e1 e) env)
+                                                       env))
          ]
         [(apair? e) ; ** apair
          (let ([t1 (infer-under-env (apair-e1 e) env)]
@@ -485,8 +494,8 @@
   (with "filter" numex-filter
         (lam null "i" (apply (var "filter") (lam "h"
                     "n"
-                    (ifleq [var "i"]
-                           [var "n"]
+                    (ifleq [var "n"]
+                           [var "i"]
                            [num 0]
                            [var "n"]))
                              ))))
