@@ -69,3 +69,4 @@
 
 (eval-exp (apply (apply numex-all-gt (num 4)) test-list))
 
+(numexlist->racketlist (apair (num 3) (apair (num 4) (apair (bool #t) (munit)))))

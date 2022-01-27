@@ -97,14 +97,14 @@
 
 (define (racketlist->numexlist xs)
   (cond [(null? xs) (munit)]
-        [(null? (cdr xs)) (cons [car xs] (cons (munit) null))]
-        [true (cons [car xs][racketlist->numexlist [cdr xs]])]
+        [(null? (cdr xs)) (apair [car xs] (munit))]
+        [true (apair [car xs][racketlist->numexlist [cdr xs]])]
         ))
 
 (define (numexlist->racketlist xs)
   (cond [(munit? xs) `()]
-        [(munit? (car(cdr xs))) (cons [car xs] null)]
-        [true (cons [car xs] [numexlist->racketlist [cdr xs]])]
+        [(munit? (apair-e2 xs)) (cons [apair-e1 xs] null)]
+        [true (cons [apair-e1 xs] [numexlist->racketlist (apair-e2 xs)])]
         ))
 
 ;; Problem 2
@@ -134,7 +134,7 @@
              [error "NUMEX var applied to non-string"])
          ]
         [(num? e)  ; ** num
-         (if [number? (num-int e)]
+         (if [integer? (num-int e)]
              e
              [error "NUMEX num applied to non-number"])
          ]
@@ -146,9 +146,11 @@
              e
              [error "NUMEX bool applied to non-boolean"])
          ]
-        [(munit? e)
+        [(munit? e) ; ** munit
          e]
-        [(string? e)
+        [(string? e) ; ** string
+         e]
+        [(list? e)
          e]
         [(plus? e) ; ** plus
          (let ([v1 (eval-under-env (plus-e1 e) env)]
@@ -181,7 +183,11 @@
                     (num? v2))
                (if (= 0 (num-int v2))
                    (error "NUMEX devide by zero")
-                   (num (/ (num-int v1) (num-int v2)))
+                   (let ([v3 (/ (num-int v1) (num-int v2))])
+                     (if [> v3 0]
+                         [num (floor v3)]
+                         [num (ceiling v3)])
+                     )
                    )
                (error "NUMEX division applied to non-number")
                  ))]
@@ -239,7 +245,7 @@
          (let ([v1 (eval-under-env (ifleq-e1 e) env)]
                [v2 (eval-under-env (ifleq-e2 e) env)])
            (if [and (num? v1) (num? v2)]
-               [if [> (num-int v1)  (num-int v2)]
+               [if [<= (num-int v1)  (num-int v2)]
                    [eval-under-env (ifleq-e3 e) env]
                    [eval-under-env (ifleq-e4 e) env]]
                [error "NUMEX ifleq applied to non-number"])
@@ -295,12 +301,12 @@
          (let ([v1 (eval-under-env (1st-e1 e) env)])
            [if (apair? v1)
                (apair-e1 v1)
-               (error "e is not a apair:" v1)])]
+               (error "NUMEX 1st applied to non-pair" v1)])]
         [(2nd? e)  ; ** second element of a apair
          (let ([v1 (eval-under-env (2nd-e1 e) env)])
            [if (apair? v1)
                (apair-e2 v1)
-               (error "e is not a apair:" v1)])]
+               (error "NUMEX 2nd applied to non-pair" v1)])]
         [(ismunit? e)  ; ** is e a munit
          (let ([v1 (eval-under-env (ismunit-e1 e) env)])
            [bool (munit? v1)]

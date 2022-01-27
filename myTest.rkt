@@ -44,7 +44,7 @@
 (append 1 `())
 (append 3 `(4 5 5 dfkg "sfa" a))
 (append-env `(4 5 5 dfkg "sfa" a) `(4r er g 56))
-(append-env test-env test-env2)
+;(append-env test-env test-env2)
 
 
 ;(extend-env "hello" (eval-under-env (plus (num 4) (num 5)) test-env) test-env)
