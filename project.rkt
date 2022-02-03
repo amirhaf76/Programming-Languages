@@ -5,10 +5,8 @@
 (provide (all-defined-out)) ;; so we can put tests in a second file
 
 (define (extend-env s e env)
-  (if (is-in-env env s)
-      (error (format "variable +v is bound" s))
       (cons [cons (var s) (eval-under-env e env)] env)
-      ))
+      )
 
 (define (is-in-env env str)
   (cond [(null? env) #f]
@@ -32,7 +30,7 @@
 (define (extend-type-env s v env)
   (if (is-in-env env s)
       (error (format "variable +v has a type" s))
-      (cons [cons (var s) (infer-under-env v env)] env)
+      (cons [cons (var s) v] env)
       ))
 
 (define (assign s e env)
@@ -96,14 +94,14 @@
 
 (define (racketlist->numexlist xs)
   (cond [(null? xs) (munit)]
-        [(null? (cdr xs)) (cons [car xs] (cons (munit) null))]
-        [true (cons [car xs][racketlist->numexlist [cdr xs]])]
+        [(null? (cdr xs)) (apair [car xs] (munit))]
+        [true (apair [car xs][racketlist->numexlist [cdr xs]])]
         ))
 
 (define (numexlist->racketlist xs)
   (cond [(munit? xs) `()]
-        [(munit? (car(cdr xs))) (cons [car xs] null)]
-        [true (cons [car xs] [numexlist->racketlist [cdr xs]])]
+        [(munit? (apair-e2 xs)) (cons [apair-e1 xs] null)]
+        [true (cons [apair-e1 xs] [numexlist->racketlist (apair-e2 xs)])]
         ))
 
 ;; Problem 2
@@ -133,7 +131,7 @@
              [error "NUMEX var applied to non-string"])
          ]
         [(num? e)  ; ** num
-         (if [number? (num-int e)]
+         (if [integer? (num-int e)]
              e
              [error "NUMEX num applied to non-number"])
          ]
@@ -145,9 +143,9 @@
              e
              [error "NUMEX bool applied to non-boolean"])
          ]
-        [(munit? e)
+        [(munit? e) ; ** munit
          e]
-        [(string? e)
+        [(string? e) ; ** string
          e]
         [(plus? e) ; ** plus
          (let ([v1 (eval-under-env (plus-e1 e) env)]
@@ -180,7 +178,11 @@
                     (num? v2))
                (if (= 0 (num-int v2))
                    (error "NUMEX devide by zero")
-                   (num (/ (num-int v1) (num-int v2)))
+                   (let ([v3 (/ (num-int v1) (num-int v2))])
+                     (if [> v3 0]
+                         [num (floor v3)]
+                         [num (ceiling v3)])
+                     )
                    )
                (error "NUMEX division applied to non-number")
                  ))]
@@ -238,7 +240,7 @@
          (let ([v1 (eval-under-env (ifleq-e1 e) env)]
                [v2 (eval-under-env (ifleq-e2 e) env)])
            (if [and (num? v1) (num? v2)]
-               [if [> (num-int v1)  (num-int v2)]
+               [if [<= (num-int v1)  (num-int v2)]
                    [eval-under-env (ifleq-e3 e) env]
                    [eval-under-env (ifleq-e4 e) env]]
                [error "NUMEX ifleq applied to non-number"])
@@ -249,33 +251,26 @@
                              (extend-env (with-s e) (with-e1 e) env)]
              [error "NUMEX with applied to non-string"])]
         [(lam? e)
-         (cond [(and (string? (lam-s1 e))
-                     (string? (lam-s2 e))) (closure (cons [cons (var (lam-s1 e))
-                                                               e]
-                                                         [cons [cons (var (lam-s2 e))
-                                                                     (munit)]
-                                                               env]
-                                                         )
-                                                   e)]
-               [(and (null? (lam-s1 e))
-                     (string? (lam-s2 e))) (closure (cons [cons (var (lam-s2 e))
-                                                                (munit)]
-                                                          env)
-                                                    e)]
+         (cond [(and (string? (lam-s2 e))
+                     (or (string? (lam-s1 e))
+                         (null? (lam-s1 e)))) (closure env e)]
                [#t (error "NUMEX lam applied to non-string")]
              )]
         [(apply? e) ; ** apply
-         (let ([v1 (eval-under-env (apply-e1 e) env)])
+         (let ([v1 (eval-under-env (apply-e1 e) env)]
+               [v2 (eval-under-env (apply-e2 e) env)])
            [if (closure? v1)
-               (eval-under-env (lam-e (closure-f v1))
-                               (append-env env
-                                           (assign (lam-s2 (closure-f v1))
-                                                   (eval-under-env (apply-e2 e) env)
-                                                   (closure-env v1)
-                                                   )
-                                           )
-                               )
-               (error "Result of e1 is not closure")]
+               (if [null? (lam-s1 (closure-f v1))]
+                   [eval-under-env (lam-e (closure-f v1))
+                               (append-env (closure-env v1) (list [cons (var (lam-s2 (closure-f v1))) v2]))]
+                   [eval-under-env (lam-e (closure-f v1))
+                               (append-env (closure-env v1) (list [cons (var (lam-s1 (closure-f v1))) (closure-f v1)]
+                                                     [cons (var (lam-s2 (closure-f v1))) v2]))]
+                   )
+               (if (lam? v1)
+                   (eval-under-env (apply (eval-under-env v1 env) (apply-e2 e)) env)
+                   (error "Result of e1 is not closure"))
+               ]
            )]
         [(apair? e) ; ** apair
          (let ([v1 (eval-under-env (apair-e1 e) env)]
@@ -285,12 +280,12 @@
          (let ([v1 (eval-under-env (1st-e1 e) env)])
            [if (apair? v1)
                (apair-e1 v1)
-               (error "e is not a apair:" v1)])]
+               (error "NUMEX 1st applied to non-pair" v1)])]
         [(2nd? e)  ; ** second element of a apair
          (let ([v1 (eval-under-env (2nd-e1 e) env)])
            [if (apair? v1)
                (apair-e2 v1)
-               (error "e is not a apair:" v1)])]
+               (error "NUMEX 2nd applied to non-pair" v1)])]
         [(ismunit? e)  ; ** is e a munit
          (let ([v1 (eval-under-env (ismunit-e1 e) env)])
            [bool (munit? v1)]
@@ -300,7 +295,11 @@
                [(not(string? (letrec-s2 e))) (error "s2 is not a string:" (letrec-s2 e))]
                [(not(string? (letrec-s3 e))) (error "s3 is not a string:" (letrec-s3 e))]
                [(not(string? (letrec-s4 e))) (error "s4 is not a string:" (letrec-s4 e))]
-               [#t (num 0)])] ; bug !!!!!!!!!!!!!!!!!!!!!!!!!!!!1111
+               [#t (eval-under-env (letrec-e5 e) (append-env (list (cons (var (letrec-s1 e))  (letrec-e1 e))
+                                                                   (cons (var (letrec-s2 e))  (letrec-e2 e))
+                                                                   (cons (var (letrec-s3 e))  (letrec-e3 e))
+                                                                   (cons (var (letrec-s4 e))  (letrec-e4 e))) env))
+                   ])]
         [(key? e) ; ** key
          (if [string? (key-s e)]
              [key (key-s e) (eval-under-env (key-e e) env)]
@@ -334,7 +333,8 @@
 ;; We will test infer-under-env by calling its helper function, infer-exp.
 (define (infer-under-env e env)
   (cond [(var? e) ; ** var
-         (infer-under-env (envlookup env (var-string e)) env)
+         ;(infer-under-env (envlookup env (var-string e)) env)
+         (envlookup env (var-string e))
          ]
         [(num? e) ; ** num
          (cond
@@ -366,15 +366,19 @@
                (error "NUMEX TYPE ERROR: conjunction applied to non-boolean")))
          ]
         [(neg? e) ; ** negation
-         (infer-under-env (neg-e1 e) env)
+         (let ([t1 (infer-under-env (neg-e1 e) env)])
+           (if [or (equal? t1 "bool")
+                   (equal? t1 "int")]
+               t1
+               [error "NUMEX TYPE ERROR: negation applied to non-boolean and non-integer"]))
          ]
         [(cnd? e) ; ** condition
          (let ([t1 (infer-under-env (cnd-e1 e) env)])
            (if (equal? "bool" t1)
                (let ([t2 (infer-under-env (cnd-e2 e) env)]
                      [t3 (infer-under-env (cnd-e3 e) env)])
-                 (if (equal? t1 t2)
-                     t1
+                 (if (equal? t2 t3)
+                     t2
                      (error "NUMEX TYPE ERROR: output of cnd aren't same type"))
                  )
                (error "NUMEX TYPE ERROR: cnd applied to non-boolean")))
@@ -388,7 +392,9 @@
            )
          ]
         [(with? e) ; ** with
-         (infer-under-env (with-e2 e) (extend-type-env (with-s e) (with-e1 e) env))
+         (infer-under-env (with-e2 e) (extend-type-env (with-s e)
+                                                       (infer-under-env (with-e1 e) env)
+                                                       env))
          ]
         [(apair? e) ; ** apair
          (let ([t1 (infer-under-env (apair-e1 e) env)]
@@ -413,9 +419,15 @@
         [(ismunit? e) ; ** ismunit
          (let ([t1 (infer-under-env (ismunit-e1 e) env)])
            (if [or (collection? t1)
-                   (equal? "null")]
+                   (equal? "null" t1)]
                "bool"
                [error "NUMEX TYPE ERROR: ismunit applied to non-collection or null"]))
+         ]
+        [(tlam? e)
+         (let ([t1 (infer-under-env (tlam-e e) (cons [cons (var (tlam-s2 e)) (tlam-type e)] env))])
+           (if [equal? t1 (tlam-type e)]
+               (function t1 t1)
+               [error "NUMEX TYPE ERROR: tlam applied to wrong type"]))
          ]
         [(apply? e)
          (let ([t1 (infer-under-env (apply-e1 e) env)]
@@ -433,39 +445,44 @@
 (define (infer-exp e)
   (infer-under-env e null))
 
+
 ;; Problem 4
 
-(define (ifmunit e1 e2 e3) "CHANGE")
+(define (ifmunit e1 e2 e3) (cnd [ismunit e1] e2 e3))
 
-(define (with* bs e2) "CHANGE")
+(define (with* bs e2)
+  (if [null? bs]
+      e2
+      [let ([p (car bs)])
+        (with (car p) (cdr p) (with* (cdr bs) e2))
+        ]))
 
-(define (ifneq e1 e2 e3 e4) "CHANGE")
+
+(define (ifneq e1 e2 e3 e4)
+  (cnd (neg (iseq e1 e2)) e3 e4))
 
 ;; Problem 5
 
-(define numex-filter "CHANGE")
+(define numex-filter (lam null
+                          "nexfilter"
+                          (lam "f"
+                               "list"
+                               (cnd [ismunit (var "list")]
+                                    [munit]
+                                    (ifnzero [apply (var "nexfilter") (1st (var "list"))]
+                                             [apair (apply (var "nexfilter") (1st (var "list")))
+                                                         (apply (var "f") (2nd (var "list")))]
+                                             [apply (var "f") (2nd(var "list"))]
+                                         ) 
+                                    )
+                          )))
 
 (define numex-all-gt
   (with "filter" numex-filter
-        "CHANGE (notice filter is now in NUMEX scope)"))
-
-;; Problem 6
-
-(define type-error-but-evaluates-ok "CHANGE")
-(define type-ok-but-evaluates-error "CHANGE")
-
-;; Challenge Problem
-
-(struct fun-challenge (nameopt formal body freevars) #:transparent) ;; a recursive(?) 1-argument function
-
-;; We will test this function directly, so it must do
-;; as described in the assignment
-(define (compute-free-vars e) "CHANGE")
-
-;; Do NOT share code with eval-under-env because that will make grading
-;; more difficult, so copy most of your interpreter here and make minor changes
-(define (eval-under-env-c e env) "CHANGE")
-
-;; Do NOT change this
-(define (eval-exp-c e)
-  (eval-under-env-c (compute-free-vars e) null))
+        (lam null "i" (apply (var "filter") (lam "h"
+                    "n"
+                    (ifleq [var "n"]
+                           [var "i"]
+                           [num 0]
+                           [var "n"]))
+                             ))))
